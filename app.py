@@ -9,8 +9,7 @@ API = '/api/v1'
 
 @app.route('/', methods=['GET'])
 def index():
-    databases = mongo.list_database_names()
-    return jsonify(databases)
+    return "Hello!"
 
 @app.route('/add_data', methods=['POST'])
 def add_data():
@@ -34,13 +33,46 @@ def list_databases():
 # Dapatkan daftar koleksi dari database tertentu
 @app.route(f'{API}/collections/<db_name>', methods=['GET'])
 def list_collections(db_name):
+    if db_name not in mongo.list_database_names():
+        return jsonify({"message": "Database Not Found."}),400
     try:
         # Switch ke database yang diberikan dalam URL
         db = mongo[db_name]
         collections = db.list_collection_names()
         return jsonify(collections)
     except Exception as e:
-        return jsonify({"error": str(e)})
+        return jsonify({"error": str(e)}),500
+
+@app.route(f'{API}/data/<db_name>/<collection_name>', methods=['GET'])
+def get_data(db_name, collection_name):
+    if db_name not in mongo.list_database_names():
+        return jsonify({"message": "Database Not Found."}),400
+    try:
+        # Switch ke database yang diberikan dalam URL
+        db = mongo[db_name]
+
+        if collection_name not in db.list_collection_names():
+            return jsonify({"message": "Collection Not Found."}),400
+        
+        # Dapatkan koleksi yang diberikan dalam URL
+        mycollection = db[collection_name]
+        # Dapatkan semua data dari koleksi
+        data = mycollection.find()
+        # Buat list kosong untuk menampung data
+        response = []
+        # Tambahkan setiap data ke list
+          # Dapatkan semua data dari koleksi
+        data = list(mycollection.find())
+
+        for d in data:
+            # Ubah _id menjadi string
+            d['_id'] = str(d['_id'])
+            # Tambahkan data ke list
+            response.append(d)
+
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}),500
 
 if __name__ == '__main__':
     app.run()
