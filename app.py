@@ -11,18 +11,55 @@ API = '/api/v1'
 def index():
     return "Hello!"
 
-@app.route('/add_data', methods=['POST'])
-def add_data():
-    data = request.get_json()
-    if data:
-        # Dapatkan koleksi (collection) MongoDB
-        mycollection = mongo.db.mycollection
-        # Tambahkan data ke koleksi
-        mycollection.insert_one(data)
-        return jsonify({"message": "Data berhasil ditambahkan."})
-    else:
-        return jsonify({"message": "Data tidak valid."})
+# Endpoint untuk menambahkan data ke sebuah koleksi
+@app.route(f'{API}/data/<db_name>/<collection_name>', methods=['POST'])
+def add_data(db_name, collection_name):
+    if db_name not in mongo.list_database_names():
+        return jsonify({"message": "Database Not Found."}), 400
 
+    try:
+        # Switch ke database yang diberikan dalam URL
+        db = mongo[db_name]
+
+        if collection_name not in db.list_collection_names():
+            return jsonify({"message": "Collection Not Found."}), 400
+
+        # Dapatkan data dari body request
+        data = request.get_json()
+        if not data:
+            return jsonify({"message": "Data not provided in the request body."}), 400
+
+        # Validasi email harus ada dan unik
+        if 'email' not in data or not data['email']:
+            return jsonify({"message": "Email is required."}), 400
+
+        # Periksa apakah email sudah ada dalam koleksi
+        existing_data = db[collection_name].find_one({"email": data['email']})
+        if existing_data:
+            return jsonify({"message": "Email already exists."}), 400
+        
+        # Periksa apakah ada field lain selain yang diperlukan
+        required_fields = ['firstName', 'lastName', 'email', 'password', 'phone', 'gender', 'role']
+        for field in data.keys():
+            if field not in required_fields:
+                return jsonify({"message": f"Field '{field}' is not allowed."}), 400
+            
+        # Pastikan data yang diberikan sesuai dengan persyaratan
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"message": f"{field} is required."}), 400
+
+        # Dapatkan koleksi yang diberikan dalam URL
+        mycollection = db[collection_name]
+
+        # Insert data ke koleksi
+        mycollection.insert_one(data)
+
+        return jsonify({"message": "Success add data."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+    
 # get database from MONGO
 @app.route(f'{API}/list_databases', methods=['GET'])
 def list_databases():
